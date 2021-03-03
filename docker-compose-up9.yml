@@ -1,0 +1,70 @@
+version: "3.1"
+services:
+  up9-passive-tapper-mongo:
+    image: gcr.io/up9-docker-hub/passive-tapper/master:latest
+    restart: always
+    environment:
+      WEB_SOCKET_PORT: "17123"
+      APP_PORTS: 27017,80
+    command:
+      - /app/passive_tapper
+      - -i
+      - eth0
+      - -verbose
+    network_mode: service:mongo
+    labels:
+      com.up9.tapped: false
+  up9-passive-tapper-app:
+    image: gcr.io/up9-docker-hub/passive-tapper/master:latest
+    restart: always
+    environment:
+      WEB_SOCKET_PORT: "17123"
+      APP_PORTS: "80"
+    command:
+      - /app/passive_tapper
+      - -i
+      - eth0
+      - -verbose
+    network_mode: service:app
+    labels:
+      com.up9.tapped: false
+  up9-collector:
+    image: gcr.io/up9-docker-hub/collector/master:latest
+    restart: always
+    volumes:
+      - /home/selton/.config/up9/tap/selton.fastapi-movie/collector.json:/opt/up9/localConfig.json
+      - /var/run/docker.sock:/var/run/docker.sock
+    env_file: /home/selton/.config/up9/tests/selton.fastapi-movie/credentials.env
+    environment:
+      MODE: local
+      AGENT_NAME: local-seltonfiuza@gmail.com
+      TRAFFIC_DUMPER_EXTERNAL_HOSTNAME: traffic.up9.app
+      UP9_ENV_SUFFIX: up9.app
+    labels:
+      com.up9.tapped: false
+    depends_on:
+      &a1
+      - mongo
+      - app
+  up9-auth-helper:
+    image: gcr.io/up9-docker-hub/authentication-helper/master:latest
+    restart: always
+    labels:
+      com.up9.tapped: false
+    depends_on: *a1
+  up9-agent:
+    image: gcr.io/up9-docker-hub/trcc-agent/master:latest
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      CONTAINER_ORCHESTRATION_SYSTEM: docker
+      UP9_ENV_SUFFIX: up9.app
+      TEST_RUNNER_VERSION: master:latest
+      AGENT_NAME: local-seltonfiuza@gmail.com
+      AGENT_ID: 5f9982222eded6bdab5d0faba45c8957
+      AUTH_HELPER_SERVER: up9-auth-helper
+    env_file: /home/selton/.config/up9/tests/selton.fastapi-movie/credentials.env
+    labels:
+      com.up9.tapped: false
+    depends_on: *a1
